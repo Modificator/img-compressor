@@ -120,13 +120,27 @@ func walkInputDir(excludeGlob glob.Glob) {
 		if err != nil {
 			return err
 		}
+		// exclude hidden directories
+		if info.IsDir() {
+			dir := filepath.Base(path)
+			if strings.HasPrefix(dir, ".") && len(dir) > 1 {
+				if verbose {
+					if dryRun {
+						fmt.Print("(dryrun) ")
+					}
+					fmt.Printf("excluded %s because it's a hidden directory\n", dir)
+				}
+				return filepath.SkipDir
+			}
+		}
+
 		// check exclude Glob for directories and images to skip
 		slashpath := filepath.ToSlash(path)
 		if excludeGlob != nil && excludeGlob.Match(slashpath) {
-			if dryRun {
-				fmt.Print("(dryrun) ")
-			}
 			if verbose {
+				if dryRun {
+					fmt.Print("(dryrun) ")
+				}
 				fmt.Printf("excluded %s because of Glob pattern passed to -exclude %q\n", slashpath, exclude)
 			}
 			// if the Glob matches as directory don't walk any further
@@ -164,16 +178,15 @@ func compress(path, ext string, size int64) {
 
 	// if not then compress and append new MD5 to file
 	if dryRun {
-		fmt.Printf("(dryrun) compressed: %s\n", path)
+		fmt.Printf("(dryrun) compressed: %s\n", name)
 		return
 	}
 
-	switch ext {
-	case ".jpg":
-		guetzli(path)
-	case ".png":
-		zopflipng(path)
-	default:
+	if ext == ".jpg" {
+		process(exec.Command("guetzli", "--quality", strconv.FormatInt(jpegQuality, 10), path, path))
+	} else if ext == ".png" {
+		process(exec.Command("zopflipng", "-m", "-y", path, path))
+	} else {
 		log.Fatal("error: file is not an image")
 	}
 
@@ -193,23 +206,7 @@ func compress(path, ext string, size int64) {
 	writeMD5toFile(newMD5)
 }
 
-func guetzli(path string) {
-	cmd := exec.Command("guetzli", "--quality", strconv.FormatInt(jpegQuality, 10), path, path)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = cmd.Stdout
-	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("error: compressing image: %s\n", out.String())
-		log.Fatal(err)
-	}
-	if verbose {
-		fmt.Printf(out.String())
-	}
-}
-
-func zopflipng(path string) {
-	cmd := exec.Command("zopflipng", "-m", "-y", path, path)
+func process(cmd *exec.Cmd) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = cmd.Stdout
