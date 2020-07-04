@@ -133,23 +133,23 @@ func walkInputDir() {
 
 func compress(path, ext string, size int64) {
 	name := filepath.Base(path)
+
 	// get MD5 of image
 	fileMD5, err := getFileMD5(path)
 	if err != nil {
 		log.Fatalf("error: failed to get MD5 of file: %s", name)
 	}
-	// check to see if already compressed
+
+	// skip if already compressed
 	if _, ok := compressed[fileMD5]; ok {
-		//fmt.Printf("already compressed: %s\n", name)
-		return
-	}
-	// if not then compress and append new MD5 to compressed.txt
-	if dryRun {
-		fmt.Printf("(dryrun) compressing: %s\n", path)
 		return
 	}
 
-	fmt.Printf("compressing: %s size %d ", name, size)
+	// if not then compress and append new MD5 to file
+	if dryRun {
+		fmt.Printf("(dryrun) compressed: %s\n", path)
+		return
+	}
 
 	switch ext {
 	case ".jpg":
@@ -170,7 +170,9 @@ func compress(path, ext string, size int64) {
 		log.Fatalf("error: failed to get size of compressed image: %s", err)
 	}
 
-	fmt.Printf("new size %d\n", fi.Size())
+	prevSize := byteCountIEC(size)
+	newSize := byteCountIEC(fi.Size())
+	fmt.Printf("compressed: %s from: %s to: %s\n", name, prevSize, newSize)
 	writeMD5toFile(newMD5)
 }
 
@@ -223,4 +225,20 @@ func writeMD5toFile(fileMD5 string) {
 	if _, err := file.WriteString(fileMD5 + "\n"); err != nil {
 		log.Println(err)
 	}
+}
+
+// convert a size in bytes to a human-readable string IEC (binary) format
+// credit: https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/
+func byteCountIEC(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB",
+		float64(b)/float64(div), "KMGTPE"[exp])
 }
