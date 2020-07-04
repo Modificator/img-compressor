@@ -29,7 +29,7 @@ var (
 	exclude     string
 	verbose     bool
 	jpegQuality int64
-	outputPath  = filename + ".txt"
+	outputPath  = "img-compressor.txt"
 	compressed  = make(map[string]struct{})
 )
 
@@ -93,7 +93,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "  %s -input-dir images\n", filename)
 	fmt.Fprintf(os.Stderr, "  %s -input-dir images -dryrun\n", filename)
 	fmt.Fprintf(os.Stderr, "  %s -input-dir . -exclude .git\n", filename)
-	fmt.Fprintf(os.Stderr, "  %s -input-dir . -exclude {\".git,*.jpg\"}\n", filename)
+	fmt.Fprintf(os.Stderr, "  %s -input-dir . -exclude \"{*www*,*node_modules*}\"\n", filename)
 	fmt.Fprintln(os.Stderr, "")
 }
 
@@ -128,7 +128,7 @@ func walkInputDir(excludeGlob glob.Glob) {
 					if dryRun {
 						fmt.Print("(dryrun) ")
 					}
-					fmt.Printf("excluded %s because it's a hidden directory\n", dir)
+					fmt.Printf("skipped %s because it's a hidden directory\n", dir)
 				}
 				return filepath.SkipDir
 			}
@@ -141,7 +141,7 @@ func walkInputDir(excludeGlob glob.Glob) {
 				if dryRun {
 					fmt.Print("(dryrun) ")
 				}
-				fmt.Printf("excluded %s because of Glob pattern passed to -exclude %q\n", slashpath, exclude)
+				fmt.Printf("skipped %s because of Glob pattern passed to -exclude %q\n", filepath.Base(path), exclude)
 			}
 			// if the Glob matches as directory don't walk any further
 			if info.IsDir() {
@@ -173,6 +173,12 @@ func compress(path, ext string, size int64) {
 
 	// skip if already compressed
 	if _, ok := compressed[fileMD5]; ok {
+		if verbose {
+			if dryRun {
+				fmt.Print("(dryrun) ")
+			}
+			fmt.Printf("skipped %s because it's already compressed\n", name)
+		}
 		return
 	}
 
