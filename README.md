@@ -1,5 +1,5 @@
 # Overview
-`img-compressor` is a command-line utility written in Go that compresses a directory of JPEG and PNG images using the [Zopfli PNG compressor][zopfli] and [Guetzli JPEG compressor][guetzli]. An MD5 of each compressed image will be written to a file (compressed.txt) so that on the next run, images that have already been compressed will be skipped.
+`img-compressor` is a command-line utility written in Go that compresses a directory of JPEG and PNG images using the [Zopfli PNG compressor][zopfli] and [Guetzli JPEG compressor][guetzli]. An MD5 of each compressed image will be written to a file (img-compressor.txt) so that on the next run, images that have already been compressed will be skipped.
 
 ## Building
 Clone the repo then run the following commands:
@@ -29,10 +29,24 @@ brew install guetzli
 ```
 
 ## Usage
-Compress all JPG and PNG images located in `source` and copy them to the`dest` directory.
 
 ```
-img-compressor -input-dir source -output-dir dest
+usage: img-compressor [OPTIONS]
+
+OPTIONS:
+  -dryrun
+        run command without making changes
+  -help
+        show help
+  -input-dir string
+        the directory containing images to compress
+  -version
+        print version number
+
+
+EXAMPLES:
+  img-compressor -input-dir images
+  img-compressor -input-dir images -dryrun
 ```
 
 ## License
