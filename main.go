@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	filename    = filepath.Base(os.Args[0])
+	filename    = "img-compressor"
 	showVersion bool
 	showHelp    bool
 	version     = "dev"
@@ -29,7 +29,7 @@ var (
 	exclude     string
 	verbose     bool
 	jpegQuality int64
-	outputPath  = "img-compressor.txt"
+	outputPath  = filename + ".txt"
 	compressed  = make(map[string]struct{})
 )
 
