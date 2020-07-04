@@ -31,15 +31,18 @@ brew install guetzli
 ## Usage
 
 ```
-usage: img-compressor [OPTIONS]
+img-compressor [OPTIONS]
 
 OPTIONS:
   -dryrun
         run command without making changes
+  -exclude string
+        Glob pattern of directories/images to exclude, e.g {".git,*.jpg"}
   -help
         show help
   -input-dir string
         the directory containing images to compress
+  -v    display more detailed output
   -version
         print version number
 
@@ -47,6 +50,8 @@ OPTIONS:
 EXAMPLES:
   img-compressor -input-dir images
   img-compressor -input-dir images -dryrun
+  img-compressor -input-dir . -exclude .git
+  img-compressor -input-dir . -exclude {".git,*.jpg"}
 ```
 
 ## License
