@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/gobwas/glob"
 )
 
 var (
@@ -23,24 +25,21 @@ var (
 	version     = "dev"
 	dryRun      bool
 	inputDir    string
+	exclude     string
+	verbose     bool
 	jpgQuality  int
 	pngQuality  int
-	ignoreDirs  = []string{"www"}
 	outputPath  = filename + ".txt"
 	compressed  = make(map[string]struct{})
 )
-
-type image struct {
-	path string
-	size int64
-	MD5  string
-}
 
 func init() {
 	flag.BoolVar(&showVersion, "version", false, "print version number")
 	flag.BoolVar(&showHelp, "help", false, "show help")
 	flag.BoolVar(&dryRun, "dryrun", false, "run command without making changes")
+	flag.BoolVar(&verbose, "v", false, "display more detailed output")
 	flag.StringVar(&inputDir, "input-dir", "", "the directory containing images to compress")
+	flag.StringVar(&exclude, "exclude", "", "Glob pattern of directories/images to exclude, e.g {\".git,*.jpg\"}")
 	flag.Usage = usage
 }
 
@@ -74,7 +73,8 @@ func main() {
 	}
 
 	loadCompressedMap()
-	walkInputDir()
+	excludeGlob := glob.MustCompile(exclude)
+	walkInputDir(excludeGlob)
 }
 
 func usage() {
@@ -85,6 +85,8 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "\nEXAMPLES:")
 	fmt.Fprintf(os.Stderr, "  %s -input-dir images\n", filename)
 	fmt.Fprintf(os.Stderr, "  %s -input-dir images -dryrun\n", filename)
+	fmt.Fprintf(os.Stderr, "  %s -input-dir . -exclude .git\n", filename)
+	fmt.Fprintf(os.Stderr, "  %s -input-dir . -exclude {\".git,*.jpg\"}\n", filename)
 	fmt.Fprintln(os.Stderr, "")
 }
 
@@ -106,19 +108,27 @@ func loadCompressedMap() {
 	}
 }
 
-func walkInputDir() {
+func walkInputDir(excludeGlob glob.Glob) {
 	err := filepath.Walk(inputDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
-			dir := filepath.Base(path)
-			for _, d := range ignoreDirs {
-				if d == dir {
-					return filepath.SkipDir
-				}
+		// check exclude Glob for directories and images to skip
+		slashpath := filepath.ToSlash(path)
+		if excludeGlob != nil && excludeGlob.Match(slashpath) {
+			if dryRun {
+				fmt.Print("(dryrun) ")
 			}
+			if verbose {
+				fmt.Printf("excluded %s because of GLOB passed to -exclude %q\n", slashpath, exclude)
+			}
+			// if the Glob matches as directory don't walk any further
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
+
 		// search path for images
 		ext := strings.ToLower(filepath.Ext(path))
 		if ext == ".jpg" || ext == ".png" {
