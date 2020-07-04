@@ -26,7 +26,7 @@ var (
 	jpgQuality  int
 	pngQuality  int
 	ignoreDirs  = []string{"www"}
-	outputPath  = "compressed.txt"
+	outputPath  = filename + ".txt"
 	compressed  = make(map[string]struct{})
 )
 
