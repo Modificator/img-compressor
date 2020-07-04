@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -27,19 +28,19 @@ var (
 	inputDir    string
 	exclude     string
 	verbose     bool
-	jpgQuality  int
-	pngQuality  int
+	jpegQuality int64
 	outputPath  = filename + ".txt"
 	compressed  = make(map[string]struct{})
 )
 
 func init() {
-	flag.BoolVar(&showVersion, "version", false, "print version number")
-	flag.BoolVar(&showHelp, "help", false, "show help")
-	flag.BoolVar(&dryRun, "dryrun", false, "run command without making changes")
-	flag.BoolVar(&verbose, "v", false, "display more detailed output")
-	flag.StringVar(&inputDir, "input-dir", "", "the directory containing images to compress")
+	flag.BoolVar(&showVersion, "version", false, "Print version number")
+	flag.BoolVar(&showHelp, "help", false, "Show help")
+	flag.BoolVar(&dryRun, "dryrun", false, "Run command without making changes")
+	flag.BoolVar(&verbose, "verbose", false, "Print a verbose output")
+	flag.StringVar(&inputDir, "input-dir", "", "Path to a directory containing images to compress")
 	flag.StringVar(&exclude, "exclude", "", "Glob pattern of directories/images to exclude, e.g {\".git,*.jpg\"}")
+	flag.Int64Var(&jpegQuality, "jpeg-quality", 84, "Visual quality to aim for expressed as a JPEG quality value")
 	flag.Usage = usage
 }
 
@@ -67,8 +68,14 @@ func main() {
 		fmt.Println("error: path does not exist")
 		os.Exit(2)
 	}
+
 	if !info.IsDir() {
 		fmt.Println("error: specified path is not a directory")
+		os.Exit(2)
+	}
+
+	if jpegQuality < 84 {
+		fmt.Println("error: jpeg-quality must be 84 or greater")
 		os.Exit(2)
 	}
 
@@ -120,7 +127,7 @@ func walkInputDir(excludeGlob glob.Glob) {
 				fmt.Print("(dryrun) ")
 			}
 			if verbose {
-				fmt.Printf("excluded %s because of GLOB passed to -exclude %q\n", slashpath, exclude)
+				fmt.Printf("excluded %s because of Glob pattern passed to -exclude %q\n", slashpath, exclude)
 			}
 			// if the Glob matches as directory don't walk any further
 			if info.IsDir() {
@@ -187,7 +194,7 @@ func compress(path, ext string, size int64) {
 }
 
 func guetzli(path string) {
-	cmd := exec.Command("guetzli", "--quality", "84", path, path)
+	cmd := exec.Command("guetzli", "--quality", strconv.FormatInt(jpegQuality, 10), path, path)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = cmd.Stdout
@@ -195,6 +202,9 @@ func guetzli(path string) {
 	if err != nil {
 		fmt.Printf("error: compressing image: %s\n", out.String())
 		log.Fatal(err)
+	}
+	if verbose {
+		fmt.Printf(out.String())
 	}
 }
 
@@ -207,6 +217,9 @@ func zopflipng(path string) {
 	if err != nil {
 		fmt.Printf("error: compressing image: %s\n", out.String())
 		log.Fatal(err)
+	}
+	if verbose {
+		fmt.Printf(out.String())
 	}
 }
 
