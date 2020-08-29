@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gobwas/glob"
 )
@@ -29,6 +30,7 @@ var (
 	exclude     string
 	verbose     bool
 	jpegQuality int64
+	workers     int
 	outputPath  = filename + ".txt"
 	compressed  = make(map[string]struct{})
 )
@@ -41,6 +43,7 @@ func init() {
 	flag.StringVar(&inputDir, "input-dir", "", "Path to a directory containing images to compress")
 	flag.StringVar(&exclude, "exclude", "", "Glob pattern of directories/images to exclude, e.g {\".git,*.jpg\"}")
 	flag.Int64Var(&jpegQuality, "jpeg-quality", 84, "Visual quality to aim for expressed as a JPEG quality value")
+	flag.IntVar(&workers, "workers", runtime.NumCPU(), "The number of concurrent proccesses to run")
 	flag.Usage = usage
 }
 
@@ -81,7 +84,28 @@ func main() {
 
 	loadCompressedMap()
 	excludeGlob := glob.MustCompile(exclude)
-	walkInputDir(excludeGlob)
+	filePaths := walkInputDir(excludeGlob)
+
+	//
+	concurrentGoroutines := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	for i, path := range filePaths {
+		jobID := i + 1
+		wg.Add(1)
+		go func(jobID int, path string) {
+			defer wg.Done()
+			concurrentGoroutines <- struct{}{}
+			if verbose {
+				fmt.Println("Doing JobID: ", jobID)
+			}
+			compress(path)
+			if verbose {
+				fmt.Println("Finished JobID: ", jobID)
+			}
+			<-concurrentGoroutines
+		}(jobID, path)
+	}
+	wg.Wait()
 }
 
 func usage() {
@@ -115,7 +139,8 @@ func loadCompressedMap() {
 	}
 }
 
-func walkInputDir(excludeGlob glob.Glob) {
+func walkInputDir(excludeGlob glob.Glob) []string {
+	filePaths := []string{}
 	err := filepath.Walk(inputDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -153,17 +178,22 @@ func walkInputDir(excludeGlob glob.Glob) {
 		// search path for images
 		ext := strings.ToLower(filepath.Ext(path))
 		if ext == ".jpg" || ext == ".png" {
-			compress(path, ext, info.Size())
+			filePaths = append(filePaths, path)
 		}
 		return nil
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
+	return filePaths
 }
 
-func compress(path, ext string, size int64) {
+func compress(path string) {
+	ext := strings.ToLower(filepath.Ext(path))
 	name := filepath.Base(path)
+
+	//TODO: Get Original Size
+	var size int64
 
 	// get MD5 of image
 	fileMD5, err := getFileMD5(path)
